@@ -1,0 +1,73 @@
+# docker-compose.yml — Starts the platform infrastructure.
+# The app containers are NOT defined here — they are created dynamically
+# by create_env.sh. Only the permanent platform services are here.
+
+networks:
+  # The platform network connects Nginx, API, and monitor together.
+  # Each env gets its OWN separate network created by create_env.sh.
+  # Nginx is also connected to each env network when an env is created.
+  platform-net:
+    driver: bridge
+
+volumes:
+  nginx-logs:
+  api-logs:
+
+services:
+
+  # ── Nginx: the front door for all environments ──────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: sandbox-nginx
+    restart: unless-stopped
+    networks:
+      - platform-net
+    ports:
+      - "80:80"
+    volumes:
+      # Main config — defines include conf.d/*.conf
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # conf.d is writable — create_env.sh writes files here
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - nginx-logs:/var/log/nginx
+    # Why keep nginx:alpine running?
+    # The container must stay alive across many nginx -s reload calls.
+    # Alpine is small (5MB) and the official Nginx image is well-maintained.
+
+  # ── API: the HTTP control plane ─────────────────────────────────────
+  api:
+    build:
+      context: ./platform
+      dockerfile: Dockerfile.api
+    container_name: sandbox-api
+    restart: unless-stopped
+    networks:
+      - platform-net
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount the whole project root so the API can read/write envs/ and logs/
+      - .:/workspace
+      # Mount Docker socket so the API can call docker commands
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WORKSPACE=/workspace
+      - API_PORT=8000
+    working_dir: /workspace
+
+  # ── Monitor: health poller ──────────────────────────────────────────
+  monitor:
+    image: python:3.11-slim
+    container_name: sandbox-monitor
+    restart: unless-stopped
+    networks:
+      - platform-net
+    volumes:
+      - .:/workspace
+    environment:
+      - NGINX_HOST=nginx
+      - NGINX_PORT=80
+    working_dir: /workspace
+    command: python3 monitor/poller.py
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

@@ -1,0 +1,17 @@
+FROM python:3.11-slim
+
+# Install ONLY docker CLI (not docker.io daemon) + curl to fetch it
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Docker CLI binary only (lightweight, no daemon)
+RUN curl -fsSL https://download.docker.com/linux/static/stable/x86_64/docker-26.1.4.tgz | \
+    tar xz --strip-components=1 -C /usr/bin/ docker/docker
+
+WORKDIR /workspace
+
+COPY requirements.api.txt /tmp/
+RUN pip install --no-cache-dir -r /tmp/requirements.api.txt
+
+CMD ["python3", "platform/api.py"]
