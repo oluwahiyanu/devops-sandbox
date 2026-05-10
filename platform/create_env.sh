@@ -132,16 +132,33 @@ cat > "$TEMP_FILE" << EOF
 }
 EOF
 
+# ... (all your existing code up to writing the STATE_FILE) ...
+
 mv "$TEMP_FILE" "$STATE_FILE"
 echo ">>> State file written: $STATE_FILE"
+
+# ─── DYNAMIC VM IP LOOKUP ────────────────────────────────────────────────────
+# Try to fetch the VM's public IP. Timeout after 2 seconds to avoid hangs.
+# Falls back to "localhost" if curl fails or if you are offline.
+VM_IP=$(curl -s --connect-timeout 2 ifconfig.me || echo "localhost")
+
+# If ifconfig.me is slow, fallback to localhost to keep execution snappy
+if [[ -z "$VM_IP" ]]; then
+    VM_IP="localhost"
+fi
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Generate dynamic display strings to keep formatting pretty
+URL_DISPLAY="http://${VM_IP}/env/${ENV_ID}/"
+PORT_DISPLAY="http://${VM_IP}:${HOST_PORT}"
 
 echo ""
 echo "╔══════════════════════════════════════════════════════╗"
 echo "║  Environment Ready                                   ║"
-echo "║  ID:    $ENV_ID                          ║"
+echo "║  ID:    $ENV_ID                              ║"
 echo "║  Name:  $ENV_NAME"
-echo "║  URL:   http://localhost/env/$ENV_ID/    ║"
-echo "║  Port:  http://localhost:$HOST_PORT               ║"
+echo "║  URL:   $URL_DISPLAY"
+echo "║  Port:  $PORT_DISPLAY"
 echo "║  TTL:   ${TTL_MINUTES} minutes                              ║"
 echo "╚══════════════════════════════════════════════════════╝"
 
