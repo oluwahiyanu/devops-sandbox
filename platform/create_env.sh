@@ -74,12 +74,8 @@ fi
 
 NGINX_CONF="$ROOT_DIR/nginx/conf.d/$ENV_ID.conf"
 cat > "$NGINX_CONF" << NGINXEOF
-server {
-    listen 80;
-    server_name localhost 127.0.0.1 host.docker.internal nginx;
-
     location /env/$ENV_ID/ {
-        rewrite ^/env/$ENV_ID/(.*)$ /$1 break;
+        rewrite ^/env/$ENV_ID/(.*)$ /\$1 break;
         proxy_pass http://sandbox-app-$ENV_ID:$APP_PORT;
         proxy_http_version 1.1;
         proxy_set_header   Host \$host;
@@ -99,7 +95,6 @@ server {
         default_type application/json;
         return 502 '{"error":"environment unreachable","env_id":"$ENV_ID"}';
     }
-}
 NGINXEOF
 
 echo ">>> Nginx config written: $NGINX_CONF"
